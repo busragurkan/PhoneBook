@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Services/" />
+  <Folder Name="/src/Services/Contact/">
+    <Project Path="src/Services/Contact/Contact.API/Contact.API.csproj" />
+    <Project Path="src/Services/Contact/Contact.UnitTests/Contact.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/Report/">
+    <Project Path="src/Services/Report/Report.API/Report.API.csproj" />
+    <Project Path="src/Services/Report/Report.UnitTests/Report.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/src/Shared/">
+    <Project Path="src/Shared/PhoneBook.Shared/PhoneBook.Shared.csproj" />
+  </Folder>
+</Solution>
