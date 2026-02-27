@@ -22,13 +22,12 @@ A simple phone book application built with a microservice architecture using .NE
 - **Contact.API** - Manages contacts and contact information (CRUD operations)
 - **Report.API** - Handles report generation requests asynchronously
 
-### Async Communication Flow
+### Communication Flow
 
 1. User requests a report via Report.API (POST /api/reports)
 2. Report.API creates a report record with "Preparing" status and publishes `ReportRequestedEvent` to RabbitMQ
-3. Contact.API consumes the event, queries contact data for the requested location
-4. Contact.API publishes `ReportCreatedEvent` with the results
-5. Report.API consumes the event and updates the report status to "Completed"
+3. Report.API's consumer picks up the event and calls Contact.API via **REST HTTP** to get location statistics
+4. Report.API updates the report with the results and sets status to "Completed"
 
 ### Tech Stack
 
@@ -49,7 +48,7 @@ A simple phone book application built with a microservice architecture using .NE
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/busragurkan/PhoneBook.git
 cd PhoneBook
 ```
 
@@ -115,6 +114,7 @@ dotnet test --verbosity normal
 | DELETE | /api/contacts/{id} | Delete a contact (cascades to contact information) |
 | POST | /api/contacts/{id}/contact-informations | Add contact information to a contact |
 | DELETE | /api/contacts/contact-informations/{id} | Remove a specific contact information |
+| GET | /api/contacts/statistics?location={loc} | Get location statistics (used by Report.API) |
 
 ### Report.API (http://localhost:5002)
 
@@ -163,7 +163,6 @@ PhoneBook/
 │   │   ├── Contact/
 │   │   │   ├── Contact.API/          # Contact microservice
 │   │   │   │   ├── Controllers/      # API endpoints
-│   │   │   │   ├── Consumers/        # RabbitMQ event consumers
 │   │   │   │   ├── Data/             # DbContext & Migrations
 │   │   │   │   ├── DTOs/             # Data transfer objects
 │   │   │   │   ├── Entities/         # Domain models
