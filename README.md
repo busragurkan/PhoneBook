@@ -1,19 +1,19 @@
 # PhoneBook
 
-Mikroservis mimarisinde basit bir telefon rehberi uygulamasi. 2 servis var: biri rehber islemleri (Contact.API), digeri konum bazli rapor olusturma (Report.API).
+Simple phone book app with microservice architecture. There are 2 services: Contact.API handles contact CRUD operations, Report.API generates location-based reports.
 
-## Kullanilan Teknolojiler
+## Tech
 
 - .NET 8
 - PostgreSQL
 - RabbitMQ + MassTransit
 - Entity Framework Core
 - Docker
-- xUnit + Moq + FluentAssertions
+- xUnit, Moq, FluentAssertions
 
-## Nasil Calistirilir
+## How to Run
 
-Docker kurulu olmasi yeterli.
+Just need Docker installed.
 
 ```bash
 git clone https://github.com/busragurkan/PhoneBook.git
@@ -21,97 +21,97 @@ cd PhoneBook
 docker-compose up --build
 ```
 
-Ayaga kalktiktan sonra:
+After everything is up:
 - Contact.API: http://localhost:5001/swagger
 - Report.API: http://localhost:5002/swagger
 - RabbitMQ: http://localhost:15672 (guest/guest)
 
-### Docker olmadan calistirmak icin
+### Without Docker
 
-PostgreSQL (5432) ve RabbitMQ (5672) lokal olarak calisiyor olmali, sonra:
+Make sure PostgreSQL (5432) and RabbitMQ (5672) are running locally, then:
 
 ```bash
 dotnet run --project src/Services/Contact/Contact.API
 dotnet run --project src/Services/Report/Report.API
 ```
 
-### Testler
+### Tests
 
 ```bash
 dotnet test
 ```
 
-## Mimari
+## How it Works
 
-Contact.API rehber islemlerini yapar (kisi ekleme/silme, iletisim bilgisi ekleme/silme vs). Report.API ise konum bazli rapor talebi olusturur.
+Contact.API is the main service for managing contacts and their info (phone, email, location). Report.API handles report requests for a given location.
 
-Rapor istegi geldiginde Report.API once RabbitMQ'ya event firlatir, sonra consumer bu eventi alip Contact.API'nin REST endpointini cagirarak o konumdaki kisi ve telefon sayisini alir. Sonucu rapora yazar.
+When a report is requested, Report.API publishes an event to RabbitMQ. The consumer picks it up and calls Contact.API's REST endpoint to get the contact/phone count for that location, then updates the report.
 
-Yani servisler arasi hem REST (senkron) hem RabbitMQ (asenkron) iletisim var.
+So there's both REST (sync) and RabbitMQ (async) communication between services.
 
-## API Endpointleri
+## Endpoints
 
 ### Contact.API
 
-- `GET /api/contacts` - Tum kisileri listele
-- `GET /api/contacts/{id}` - Kisi detayi (iletisim bilgileri dahil)
-- `POST /api/contacts` - Yeni kisi olustur
-- `DELETE /api/contacts/{id}` - Kisi sil
-- `POST /api/contacts/{id}/contact-informations` - Kisiye iletisim bilgisi ekle
-- `DELETE /api/contacts/contact-informations/{id}` - Iletisim bilgisi sil
-- `GET /api/contacts/statistics?location=X` - Konum istatistigi (Report.API tarafindan kullanilir)
+- `GET /api/contacts` - list all contacts
+- `GET /api/contacts/{id}` - contact detail with contact info
+- `POST /api/contacts` - create contact
+- `DELETE /api/contacts/{id}` - delete contact
+- `POST /api/contacts/{id}/contact-informations` - add contact info
+- `DELETE /api/contacts/contact-informations/{id}` - remove contact info
+- `GET /api/contacts/statistics?location=X` - location stats (used internally by Report.API)
 
 ### Report.API
 
-- `POST /api/reports` - Rapor talebi olustur
-- `GET /api/reports` - Tum raporlari listele
-- `GET /api/reports/{id}` - Rapor detayi
+- `POST /api/reports` - request a report
+- `GET /api/reports` - list reports
+- `GET /api/reports/{id}` - report detail
 
-## Veri Modeli
+## Data Model
 
 **Contact:** Id (UUID), Name, Surname, Company
 
-**ContactInformation** (ayri tablo): Id, ContactId (FK), InfoType (Phone/Email/Location), InfoContent
+**ContactInformation** (separate table): Id, ContactId (FK), InfoType (Phone/Email/Location), InfoContent
 
-## Ornek Kullanim
+## Examples
 
-Kisi olustur:
+Create contact:
 ```
 POST /api/contacts
 { "name": "Ali", "surname": "Yilmaz", "company": "Arvento" }
 ```
 
-Telefon ekle:
+Add phone number:
 ```
 POST /api/contacts/{id}/contact-informations
 { "infoType": 0, "infoContent": "+905551234567" }
 ```
 
-infoType: 0 = Telefon, 1 = Email, 2 = Konum
+infoType: 0 = Phone, 1 = Email, 2 = Location
 
-Rapor iste:
+Request report:
 ```
 POST /api/reports
 { "location": "Ankara" }
 ```
 
-## Proje Yapisi
+## Project Structure
 
 ```
 src/
   Services/
     Contact/
-      Contact.API/        -> Rehber servisi
-      Contact.UnitTests/  -> 30 test
+      Contact.API/        -> contact service
+      Contact.UnitTests/  -> 30 tests
     Report/
-      Report.API/         -> Rapor servisi
-      Report.UnitTests/   -> 9 test
+      Report.API/         -> report service
+      Report.UnitTests/   -> 9 tests
   Shared/
-    PhoneBook.Shared/     -> Ortak DTO, enum, event sinflari
+    PhoneBook.Shared/     -> shared DTOs, enums, events
 ```
 
-## Branch Stratejisi
+## Branches
 
-master <- development <- feature/* branchleri
+master <- development <- feature/* branches
 
-Versiyon tagleri: v0.1.0, v0.2.0, v0.3.0, v1.0.0
+Tags: v0.1.0, v0.2.0, v0.3.0, v1.0.0
