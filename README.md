@@ -1,197 +1,117 @@
-# PhoneBook - Microservice Phone Book Application
+# PhoneBook
 
-A simple phone book application built with a microservice architecture using .NET 8, PostgreSQL, and RabbitMQ. The system consists of two independent services communicating both synchronously (REST) and asynchronously (RabbitMQ).
+Mikroservis mimarisinde basit bir telefon rehberi uygulamasi. 2 servis var: biri rehber islemleri (Contact.API), digeri konum bazli rapor olusturma (Report.API).
 
-## Architecture
+## Kullanilan Teknolojiler
 
-```
-┌─────────────────┐    REST/HTTP     ┌──────────────────┐
-│                 │ ◄──────────────► │                  │
-│  Contact.API    │                  │  Report.API      │
-│  (Port: 5001)   │    RabbitMQ      │  (Port: 5002)    │
-│                 │ ──────────────►  │                  │
-└────────┬────────┘   (async)        └────────┬─────────┘
-         │                                     │
-         ▼                                     ▼
-   ┌───────────┐                         ┌───────────┐
-   │ PostgreSQL │                         │ PostgreSQL │
-   │ ContactDb  │                         │ ReportDb   │
-   └───────────┘                         └───────────┘
-```
+- .NET 8
+- PostgreSQL
+- RabbitMQ + MassTransit
+- Entity Framework Core
+- Docker
+- xUnit + Moq + FluentAssertions
 
-- **Contact.API** - Manages contacts and contact information (CRUD operations)
-- **Report.API** - Handles report generation requests asynchronously
+## Nasil Calistirilir
 
-### Communication Flow
+Docker kurulu olmasi yeterli.
 
-1. User requests a report via Report.API (POST /api/reports)
-2. Report.API creates a report record with "Preparing" status and publishes `ReportRequestedEvent` to RabbitMQ
-3. Report.API's consumer picks up the event and calls Contact.API via **REST HTTP** to get location statistics
-4. Report.API updates the report with the results and sets status to "Completed"
-
-### Tech Stack
-
-- .NET 8 (ASP.NET Core Web API)
-- PostgreSQL 16
-- RabbitMQ 3 (with MassTransit library)
-- Entity Framework Core 8
-- Docker & Docker Compose
-- xUnit, Moq, FluentAssertions (Unit Testing)
-
-## Getting Started
-
-### Prerequisites
-
-- [Docker](https://www.docker.com/get-started) and Docker Compose installed on your machine
-
-### Running the Application
-
-1. Clone the repository:
 ```bash
 git clone https://github.com/busragurkan/PhoneBook.git
 cd PhoneBook
-```
-
-2. Run with Docker Compose:
-```bash
 docker-compose up --build
 ```
 
-3. Access the services:
-   - **Contact.API Swagger**: http://localhost:5001/swagger
-   - **Report.API Swagger**: http://localhost:5002/swagger
-   - **RabbitMQ Management UI**: http://localhost:15672 (guest/guest)
+Ayaga kalktiktan sonra:
+- Contact.API: http://localhost:5001/swagger
+- Report.API: http://localhost:5002/swagger
+- RabbitMQ: http://localhost:15672 (guest/guest)
 
-### Running Without Docker
+### Docker olmadan calistirmak icin
 
-1. Ensure PostgreSQL (port 5432) and RabbitMQ (port 5672) are running locally
-2. Update connection strings in `appsettings.json` files if needed
-3. Run each service in separate terminals:
+PostgreSQL (5432) ve RabbitMQ (5672) lokal olarak calisiyor olmali, sonra:
+
 ```bash
 dotnet run --project src/Services/Contact/Contact.API
 dotnet run --project src/Services/Report/Report.API
 ```
 
-### Running Tests
+### Testler
 
-Run all unit tests:
 ```bash
 dotnet test
 ```
 
-Run tests with detailed output:
-```bash
-dotnet test --verbosity normal
+## Mimari
+
+Contact.API rehber islemlerini yapar (kisi ekleme/silme, iletisim bilgisi ekleme/silme vs). Report.API ise konum bazli rapor talebi olusturur.
+
+Rapor istegi geldiginde Report.API once RabbitMQ'ya event firlatir, sonra consumer bu eventi alip Contact.API'nin REST endpointini cagirarak o konumdaki kisi ve telefon sayisini alir. Sonucu rapora yazar.
+
+Yani servisler arasi hem REST (senkron) hem RabbitMQ (asenkron) iletisim var.
+
+## API Endpointleri
+
+### Contact.API
+
+- `GET /api/contacts` - Tum kisileri listele
+- `GET /api/contacts/{id}` - Kisi detayi (iletisim bilgileri dahil)
+- `POST /api/contacts` - Yeni kisi olustur
+- `DELETE /api/contacts/{id}` - Kisi sil
+- `POST /api/contacts/{id}/contact-informations` - Kisiye iletisim bilgisi ekle
+- `DELETE /api/contacts/contact-informations/{id}` - Iletisim bilgisi sil
+- `GET /api/contacts/statistics?location=X` - Konum istatistigi (Report.API tarafindan kullanilir)
+
+### Report.API
+
+- `POST /api/reports` - Rapor talebi olustur
+- `GET /api/reports` - Tum raporlari listele
+- `GET /api/reports/{id}` - Rapor detayi
+
+## Veri Modeli
+
+**Contact:** Id (UUID), Name, Surname, Company
+
+**ContactInformation** (ayri tablo): Id, ContactId (FK), InfoType (Phone/Email/Location), InfoContent
+
+## Ornek Kullanim
+
+Kisi olustur:
 ```
-
-## Data Model
-
-### Contact
-| Field | Type | Description |
-|-------|------|-------------|
-| Id | UUID | Primary key |
-| Name | string | First name (required, max 100) |
-| Surname | string | Last name (required, max 100) |
-| Company | string | Company name (max 200) |
-
-### ContactInformation (separate table)
-| Field | Type | Description |
-|-------|------|-------------|
-| Id | UUID | Primary key |
-| ContactId | UUID | Foreign key to Contact |
-| InfoType | enum | PhoneNumber, Email, Location |
-| InfoContent | string | The actual information content |
-
-## API Endpoints
-
-### Contact.API (http://localhost:5001)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /api/contacts | List all contacts |
-| GET | /api/contacts/{id} | Get contact detail with all contact information |
-| POST | /api/contacts | Create a new contact |
-| DELETE | /api/contacts/{id} | Delete a contact (cascades to contact information) |
-| POST | /api/contacts/{id}/contact-informations | Add contact information to a contact |
-| DELETE | /api/contacts/contact-informations/{id} | Remove a specific contact information |
-| GET | /api/contacts/statistics?location={loc} | Get location statistics (used by Report.API) |
-
-### Report.API (http://localhost:5002)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | /api/reports | Request a new location-based report (async) |
-| GET | /api/reports | List all reports |
-| GET | /api/reports/{id} | Get report detail with status |
-
-### Sample Requests
-
-**Create a contact:**
-```json
 POST /api/contacts
-{
-  "name": "Ali",
-  "surname": "Yilmaz",
-  "company": "Arvento"
-}
+{ "name": "Ali", "surname": "Yilmaz", "company": "Arvento" }
 ```
 
-**Add phone number to contact:**
-```json
-POST /api/contacts/{contactId}/contact-informations
-{
-  "infoType": 0,
-  "infoContent": "+905551234567"
-}
+Telefon ekle:
 ```
-> InfoType values: 0 = PhoneNumber, 1 = Email, 2 = Location
+POST /api/contacts/{id}/contact-informations
+{ "infoType": 0, "infoContent": "+905551234567" }
+```
 
-**Request a report:**
-```json
+infoType: 0 = Telefon, 1 = Email, 2 = Konum
+
+Rapor iste:
+```
 POST /api/reports
-{
-  "location": "Ankara"
-}
+{ "location": "Ankara" }
 ```
 
-## Project Structure
+## Proje Yapisi
 
 ```
-PhoneBook/
-├── src/
-│   ├── Services/
-│   │   ├── Contact/
-│   │   │   ├── Contact.API/          # Contact microservice
-│   │   │   │   ├── Controllers/      # API endpoints
-│   │   │   │   ├── Data/             # DbContext & Migrations
-│   │   │   │   ├── DTOs/             # Data transfer objects
-│   │   │   │   ├── Entities/         # Domain models
-│   │   │   │   ├── Repositories/     # Data access layer
-│   │   │   │   ├── Services/         # Business logic layer
-│   │   │   │   └── Dockerfile
-│   │   │   └── Contact.UnitTests/    # Unit tests (30 tests)
-│   │   └── Report/
-│   │       ├── Report.API/           # Report microservice
-│   │       │   ├── Controllers/
-│   │       │   ├── Consumers/
-│   │       │   ├── Data/
-│   │       │   ├── DTOs/
-│   │       │   ├── Entities/
-│   │       │   ├── Repositories/
-│   │       │   ├── Services/
-│   │       │   └── Dockerfile
-│   │       └── Report.UnitTests/     # Unit tests (9 tests)
-│   └── Shared/
-│       └── PhoneBook.Shared/         # Shared models, enums, events
-├── docker-compose.yml                # Docker orchestration
-├── init-databases.sh                 # PostgreSQL multi-db init script
-├── PhoneBook.slnx                    # Solution file
-└── README.md
+src/
+  Services/
+    Contact/
+      Contact.API/        -> Rehber servisi
+      Contact.UnitTests/  -> 30 test
+    Report/
+      Report.API/         -> Rapor servisi
+      Report.UnitTests/   -> 9 test
+  Shared/
+    PhoneBook.Shared/     -> Ortak DTO, enum, event sinflari
 ```
 
-## Git Branching Strategy
+## Branch Stratejisi
 
-- `master` - Production-ready code
-- `development` - Integration branch
-- `feature/*` - Feature branches (merged into development)
-- Version tags: v0.1.0, v0.2.0, v0.3.0, v1.0.0
+master <- development <- feature/* branchleri
+
+Versiyon tagleri: v0.1.0, v0.2.0, v0.3.0, v1.0.0
